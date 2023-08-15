@@ -1,0 +1,54 @@
+auth_enabled: false
+server:
+  http_listen_port: 3100
+  http_server_read_timeout: 600s
+  grpc_server_max_recv_msg_size: 1.048576e+9
+  grpc_server_max_send_msg_size: 1.048576e+9
+ingester:
+  wal:
+    enabled: false
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 5m
+  chunk_retain_period: 30s
+schema_config:
+  configs:
+    - from: 2018-01-10
+      store: boltdb
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 168h
+storage_config:
+  boltdb:
+    directory: /data/loki/index
+  filesystem:
+    directory: /data/loki/chunks
+querier:
+  max_concurrent: 25
+  engine:
+    timeout: 10m
+  query_timeout: 10m
+frontend_worker:
+  parallelism: 25
+frontend:
+  log_queries_longer_than: 5s
+  compress_responses: true
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: false
+  reject_old_samples_max_age: 100000h
+  max_query_length: 0h
+  max_query_series: 100000
+  max_entries_limit_per_query: 500000
+#chunk_store_config:
+#  max_look_back_period: 0s
+#table_manager:
+#  retention_deletes_enabled: false
+#  retention_period: 0s
