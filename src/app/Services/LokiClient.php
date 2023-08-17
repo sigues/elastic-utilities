@@ -16,15 +16,15 @@ class LokiClient
         }
     }
 
-    public function push(array $entries, string $labels): int
+    public function push(array $entries, $labels): int
     {
         $ch = curl_init();
 
         $data = [
             'streams' => [
                 [
-                    'labels' => $labels,
-                    'entries' => $entries
+                    'stream' => $labels,
+                    'values' => $entries
                 ]
             ]
         ];

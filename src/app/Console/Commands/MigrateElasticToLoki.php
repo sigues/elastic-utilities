@@ -85,25 +85,20 @@ class MigrateElasticToLoki extends Command
         foreach ($documentsBatch['documents'] as $document) {
             $labels = $this->getLabels($document);
 
-            $stream = '{' .implode(',', $labels). '}';
-
             $dateTime = $document['_source']['date_time'];
             $carbonTime = Carbon::parse($dateTime);
 
             $response = $this->loki->push([
-                'ts' => $carbonTime->toISOString(),
-                'line' => json_encode($document['_source']),
-            ], $stream);
+                [(string) ($carbonTime->timestamp * 1000 * 1000 * 1000), json_encode($document['_source'])]
+            ], $labels);
 
             if ($response !== 204) {
                 dump($response);
-                dump($stream);
                 dump('sync failed');
                 exit;
             } else {
                 $this->syncTracker->persist($documentsBatch['index'], $carbonTime, $this->type);
             }
-
 
             if (self::$terminate === true) {
                 dump('finishing gracefully');
@@ -112,7 +107,56 @@ class MigrateElasticToLoki extends Command
         }
     }
 
+    /**
+     * Getting labels to send to the new loki endpoint /loki/api/v1/push
+     *
+     * @param $document
+     * @return array
+     */
     private function getLabels($document): array
+    {
+        $labels = [
+            'event_type' => $document['_source']['event_type'] ,
+            'type' => $this->type,
+        ];
+
+        if (isset($document['_source']['active_user'])) {
+            $labels['active_user_id'] = (string) $document['_source']['active_user']['id'];
+            $labels['figured_staff'] = ($document['_source']['active_user']['figured_staff'] ? 'true' : 'false');
+
+            if ($document['_source']['active_user']['orgs']) {
+                $orgs = Arr::where($document['_source']['active_user']['orgs'], function($item) {
+                    return $item['name'] !== 'Figured Support';
+                });
+
+                if ($orgs) {
+                    $org = array_shift($orgs);
+                    $labels['active_org_name'] = $org['name'];
+                    $labels['active_org_id'] = $org['id'];
+                }
+            }
+        }
+
+        if (isset($document['_source']['active_farm']) && is_array($document['_source']['active_farm'])) {
+            $labels['active_farm_id'] = (string) $document['_source']['active_farm']['id'];
+            $labels['country_code'] = $document['_source']['active_farm']['country_code'];
+            $labels['farm_demo'] = ($document['_source']['active_farm']['demo'] ? 'true' : 'false');
+        }
+
+        if (isset($document['_source']['http']) && is_array($document['_source']['http'])) {
+            $labels['http_method'] = $document['_source']['http']['method'];
+        }
+
+        return $labels;
+    }
+
+    /**
+     * Getting labels to send to the old loki endpoint /api/prom/push (deprecated)
+     *
+     * @param $document
+     * @return array
+     */
+    private function getLabelsOld($document): array
     {
         $labels = [
             'event_type="' . $document['_source']['event_type'] . '"',
